@@ -1,3 +1,9 @@
+
+
+
+
+
+![alt text](https://github.com/Beonlytom/Lilpypr3d.py---Little-Python-Projection-Renderer-3D/blob/main/Lilpypr3d.py---Little-Python-Projection-Renderer-3D.png?raw=true)
 # 🧵 2D OBJ Renderer
 
 A lightweight Python renderer that projects 3D `.obj` models onto a 2D pixel canvas using custom math and basic geometry.
