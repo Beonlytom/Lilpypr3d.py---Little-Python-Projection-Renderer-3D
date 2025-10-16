@@ -21,6 +21,11 @@ The math behind the projection and shading was **invented on the spot**, so it's
 - Random color generation
 - Simple geometry tools (lines, triangles, midpoints)
 - OBJ file parsing for vertices and faces
+- NEW: Progressive Build Animation and Video Creation!
+
+The renderer can iterate over each face and save it as a progressive frame, simulating the model being "built."
+
+Automatic compilation of these frames into a final video file (Output_video.mp4) using OpenCV (cv2).
 
 - ![alt text](https://github.com/Beonlytom/Lilpypr3d.py---Little-Python-Projection-Renderer-3D/blob/main/Image2.png)
 
