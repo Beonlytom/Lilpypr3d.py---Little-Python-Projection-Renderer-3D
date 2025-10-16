@@ -2,7 +2,9 @@ from PIL import Image, ImageDraw  # Python Imaging Library for creating and mani
 from tqdm import tqdm # A library for creating smart, fast progress bars
 import math      # For mathematical operations like square root and floor
 import random    # For generating random numbers
-
+import cv2
+import os
+from typing import List
 
 
 # A palette of common colors defined as RGB tuples for easy access
@@ -27,8 +29,8 @@ Left = [-1,0]
 
 
 # Set the dimensions of the output image
-Render_Width = 2000
-Render_Height = 2000
+Render_Width = 1000
+Render_Height = 1000
 
 # Create a new blank image with the specified dimensions and a green background.
 # This image object will act as our canvas.
@@ -161,8 +163,47 @@ def Draw_Wireframe_Projection(Obj_Model, color):
         
         # Draw the triangle outline
         Draw_Triangle([Point1x, Point1y], [Point2x, Point2y], [Point3x, Point3y], color)
+def Draw_Wireframe_Projection_Animation(Obj_Model, color):
+    """
+    Renders a 3D model in wireframe mode. It reads faces from the model
+    and draws the outline of each triangle on the 2D canvas.
+    """
+    framelist = []
+    framecounter = 0
+    wbar = tqdm(Obj_Model.Faces_List, desc="Wireframe Rendering Progress:", unit=" Mesh Lines", smoothing=0)
+    for line in wbar:
+        # For each vertex of the face, get its 3D coordinates from the vertex list
+        # The indices line[0], line[3], line[6] are used because the face data
+        # is stored on the same line in different position
+        
+        # Vertex 1
+        Point1x = (Obj_Model.Vertex_List[line[0] - 1][0] + 1) * (Render_Width / 2)
+        Point1y = (Obj_Model.Vertex_List[line[0] - 1][1] + 1) * (Render_Height / 2)
+
+        # Vertex 2
+        Point2x = (Obj_Model.Vertex_List[line[3] - 1][0] + 1) * (Render_Width / 2)
+        Point2y = (Obj_Model.Vertex_List[line[3] - 1][1] + 1) * (Render_Height / 2)
+
+        # Vertex 3
+        Point3x = (Obj_Model.Vertex_List[line[6] - 1][0] + 1) * (Render_Width / 2)
+        Point3y = (Obj_Model.Vertex_List[line[6] - 1][1] + 1) * (Render_Height / 2)
+        
+        # The formulas above convert model coordinates (from -1 to 1) to screen coordinates (from 0 to Render_Width/Height).
+        # Draw the triangle outline
+        Draw_Triangle([Point1x, Point1y], [Point2x, Point2y], [Point3x, Point3y], color)
+        flip_img = Render_Output.transpose(Image.FLIP_TOP_BOTTOM)
+        flip_img.save("Render_Frame" + str(framecounter) +".png")
+        framelist.append("Render_Frame" + str(framecounter) +".png")
+        framecounter += 1
+        # Same stuff to generate frames and the video from Draw_Mesh_Projection_Animation
+    Create_Video_from_Images(framelist)
+    ebar = tqdm(framelist, desc="Frame Elimination Progress:", unit="Elim.Frame.", smoothing=0)
+    for i in ebar:
+        os.remove(i)
 
 def Draw_Mesh_Projection(Obj_Model, color):
+
+
     """
     Renders a 3D model as a solid mesh with depth-based shading.
     Closer faces are drawn with a brighter color.
@@ -203,6 +244,95 @@ def Draw_Mesh_Projection(Obj_Model, color):
         # Draw the filled triangle using the calculated depth as a grayscale color.
         # The Draw_Point function will handle the Z-buffering to ensure correct ordering.
         Draw_Filled_Triangle([Point1x,Point1y],[Point2x,Point2y],[Point3x,Point3y], (int(depth), int(depth), int(depth)))
+        
+def Draw_Mesh_Projection_Animation(Obj_Model, color):
+    framecounter = 0
+    framelist = []
+
+    """
+    Renders a 3D model as a solid mesh with depth-based shading.
+    Closer faces are drawn with a brighter color.
+    """
+    # Create a progress bar for the rendering process
+    pbar = tqdm(Obj_Model.Faces_List, desc="Rendering Progress:", unit="Mesh", smoothing=0)
+    video = cv2.VideoWriter("Video Output", cv2.VideoWriter_fourcc(*'DIVX'), 1, (Render_Width, Render_Height))
+    for line in pbar:
+        # --- Project 3D vertices to 2D screen coordinates ---
+        # This mapping converts model space coordinates (usually -1 to 1) to screen space (0 to 200)
+        # Vertex 1
+        Point1x = (Obj_Model.Vertex_List[line[0] - 1][0] + 1) * (Render_Width / 2)
+        Point1y = (Obj_Model.Vertex_List[line[0] - 1][1] + 1) * (Render_Height / 2)
+
+        # Vertex 2
+        Point2x = (Obj_Model.Vertex_List[line[3] - 1][0] + 1) * (Render_Width / 2)
+        Point2y = (Obj_Model.Vertex_List[line[3] - 1][1] + 1) * (Render_Height / 2)
+
+        # Vertex 3
+        Point3x = (Obj_Model.Vertex_List[line[6] - 1][0] + 1) * (Render_Width / 2)
+        Point3y = (Obj_Model.Vertex_List[line[6] - 1][1] + 1) * (Render_Height / 2)
+
+        # --- Calculate depth for Z-buffering and shading ---
+        # Average the Z-coordinates of the triangle's three vertices
+        avg_z = (Obj_Model.Vertex_List[line[0] - 1][2] + 
+                 Obj_Model.Vertex_List[line[3] - 1][2] + 
+                 Obj_Model.Vertex_List[line[6] - 1][2])
+        # Normalize the depth to a 0-255 grayscale value for coloring
+        # We assume Z is in [-1, 1], so (avg_z/3 + 1)/2 maps it to [0,1], then scale by 255.
+        depth = ((avg_z / 3 + 1) / 2) * 255
+        
+        # Note: The following line is inefficient as it's called inside a loop.
+        # It was likely part of an earlier experiment with random colors.
+        colorlist = Generate_Color_Shades(100)
+        # The commented-out line below would draw triangles with random colors.
+        # Draw_Filled_Triangle([Point1x,Point1y],[Point2x,Point2y],[Point3x,Point3y], colorlist[random.randrange(0 ,len(colorlist) - 1)])
+        
+        # Draw the filled triangle using the calculated depth as a grayscale color.
+        # The Draw_Point function will handle the Z-buffering to ensure correct ordering.
+        Draw_Filled_Triangle([Point1x,Point1y],[Point2x,Point2y],[Point3x,Point3y], (int(depth), int(depth), int(depth)))
+        flip_img = Render_Output.transpose(Image.FLIP_TOP_BOTTOM)
+    
+        # Save the final rendered image to a PNG file.
+        flip_img.save("Render_Frame" + str(framecounter) +".png")
+        framelist.append("Render_Frame" + str(framecounter) +".png")
+        framecounter += 1
+    print(framelist)
+    Create_Video_from_Images(framelist)
+    ebar = tqdm(framelist, desc="Frame Elimination Progress:", unit="Elim.Frame.", smoothing=0)
+    for i in ebar:
+        os.remove(i)
+
+
+def Create_Video_from_Images(
+    images: List[str],
+    out_file: str = 'Output_video.mp4',
+    fps: int = 60
+):
+    writer = None
+    frame_size = None
+    ibar = tqdm(images, desc="Video Creation Progress:", unit="Frame", smoothing=0)
+    for img_path in ibar:
+        if not os.path.exists(img_path):
+            continue
+            
+        frame = cv2.imread(img_path)
+        if frame is None:
+            continue
+
+        if writer is None:
+            h, w, _ = frame.shape
+            frame_size = (w, h)
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            writer = cv2.VideoWriter(out_file, fourcc, float(fps), frame_size)
+            if not writer.isOpened():
+                raise IOError("VideoWriter failed to open.")
+
+        if (frame.shape[1], frame.shape[0]) != frame_size:
+            frame = cv2.resize(frame, frame_size)
+            
+        writer.write(frame)
+
+    if writer:
+        writer.release()
 
 # --- Data Structure for 3D Model ---
 
@@ -258,14 +388,13 @@ if __name__ == "__main__":
     Objmodel = Model("OBJ Test Model", 
                      Model.Model_Vertex_Constructor("model.obj"), 
                      Model.Model_Faces_Constructor("model.obj"))
-                     
+    flip_img = Render_Output.transpose(Image.FLIP_TOP_BOTTOM)
     # Render the loaded model as a solid mesh. The 'red' color argument is not used
     # because the function calculates its own grayscale color based on depth.
-    Draw_Wireframe_Projection(Objmodel, red)
+    Draw_Wireframe_Projection_Animation(Objmodel, red)
 
     # The Y-axis is often inverted between 3D modeling coordinates and 2D image coordinates.
     # Flip the final image vertically to correct the orientation.
-    flip_img = Render_Output.transpose(Image.FLIP_TOP_BOTTOM)
     
     # Save the final rendered image to a PNG file.
     flip_img.save("Render_output.png")
