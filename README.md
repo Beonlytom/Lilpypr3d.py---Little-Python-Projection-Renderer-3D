@@ -43,6 +43,7 @@ Automatic compilation of these frames into a final video file (Output_video.mp4)
 4. Applies shading based on average depth (Z-axis).
 5. Saves the final image as `Render_output.png`.
 
+- ![alt text](https://github.com/Beonlytom/Lilpypr3d.py---Little-Python-Projection-Renderer-3D/blob/main/gif.gif)
 ## ⚠️ Disclaimer
 
 This is **not** a production-grade renderer.  
